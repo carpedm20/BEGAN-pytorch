@@ -13,6 +13,7 @@ PyTorch implementation of [BEGAN: Boundary Equilibrium Generative Adversarial Ne
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [torch-vision](https://github.com/pytorch/vision)
 - [requests](https://github.com/kennethreitz/requests) (Only used for downloading CelebA dataset)
+- [TensorFlow](https://github.com/tensorflow/tensorflow) (Only used TensorBoard for logging)
 
 
 ## Usage
@@ -34,7 +35,7 @@ or you can use your own dataset by placing images like:
 To train a model:
 
     $ python main.py --dataset=CelebA --num_gpu=1
-    $ python main.py --dataset=YOUR_DATASET_NAME --num_gpu=4
+    $ python main.py --dataset=YOUR_DATASET_NAME --num_gpu=4 --use_tensorboard=True
 
 To test a model (use your `load_path`):
 
@@ -42,6 +43,8 @@ To test a model (use your `load_path`):
 
 
 ## Results
+
+![alt tag](./assets/board-2017-04-04.png)
 
 (in progress)
 
