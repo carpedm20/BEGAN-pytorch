@@ -230,7 +230,7 @@ class Trainer(object):
             print("[!] No checkpoint found in {}...".format(self.load_path))
             return
 
-        idxes = [int(os.path.basename(path.split('.')[0].split('_')[-1])) for path in paths]
+        idxes = [int(os.path.basename(path.split('.')[1].split('_')[-1])) for path in paths]
         self.start_step = max(idxes)
 
         if self.num_gpu == 0:
