@@ -44,6 +44,8 @@ To test a model (use your `load_path`):
 
 ## Results
 
+Failed to reproduce the result of the paper. Looks like `k_t` doesn't head to `gamma` and there is a mode collapsing problem (not sure how the paper deals with this without pulling-away term of EBGAN).
+
 ![alt tag](./assets/board-2017-04-04.png)
 
 (in progress)

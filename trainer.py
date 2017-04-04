@@ -75,10 +75,9 @@ class Trainer(object):
 
             def inject_summary(summary_writer, tag, value, step):
                 if hasattr(value, '__len__'):
-                    summary = tf.Summary()
-                    sio = StringIO.StringIO()
-
                     for idx, img in enumerate(value):
+                        summary = tf.Summary()
+                        sio = StringIO.StringIO()
                         scipy.misc.toimage(img).save(sio, format="png")
                         image_summary = tf.Summary.Image(encoded_image_string=sio.getvalue())
                         summary.value.add(tag="{}/{}".format(tag, idx), image=image_summary)
