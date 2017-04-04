@@ -50,26 +50,29 @@ class DiscriminatorCNN(BaseModel):
         self.num_gpu = num_gpu
 
         # Encoder
-        self.layers = []
-        self.layers.append(nn.Conv2d(input_channel, hidden_num, 3, 1, 1))
-        self.layers.append(nn.ELU(True))
+        layers = []
+        layers.append(nn.Conv2d(input_channel, hidden_num, 3, 1, 1))
+        layers.append(nn.ELU(True))
 
         prev_channel_num = hidden_num
         for idx in range(repeat_num):
             channel_num = hidden_num * (idx + 1)
-            self.layers.append(nn.Conv2d(prev_channel_num, channel_num, 3, 1, 1))
-            self.layers.append(nn.ELU(True))
-            self.layers.append(nn.Conv2d(channel_num, channel_num, 3, 1, 1))
-            self.layers.append(nn.ELU(True))
-            prev_channel_num = channel_num
+            layers.append(nn.Conv2d(prev_channel_num, channel_num, 3, 1, 1))
+            layers.append(nn.ELU(True))
 
             if idx < repeat_num - 1:
-                self.layers.append(nn.MaxPool2d(2))
-                #self.layers.append(nn.MaxPool2d(1, 2))
+                layers.append(nn.Conv2d(channel_num, channel_num, 3, 2, 1))
+                #layers.append(nn.MaxPool2d(2))
+                #layers.append(nn.MaxPool2d(1, 2))
+            else:
+                layers.append(nn.Conv2d(channel_num, channel_num, 3, 1, 1))
+
+            layers.append(nn.ELU(True))
+            prev_channel_num = channel_num
 
         self.conv1_output_dim = [channel_num, 8, 8]
 
-        self.conv1 = torch.nn.Sequential(*self.layers)
+        self.conv1 = torch.nn.Sequential(*layers)
         self.fc1 = nn.Linear(8*8*channel_num, z_num)
 
         # Decoder

@@ -150,22 +150,28 @@ class Trainer(object):
             d_loss = L_x - k_t * L_D(self.G(z_D).detach())
             g_loss = L_G(self.G(z_G))
 
-            loss = d_loss + g_loss
+            loss = d_loss #+ g_loss
 
             loss.backward()
             optim.step()
 
-            k_t = k_t + (self.lambda_k * (self.gamma * L_x - g_loss)).data[0]
+            L_x = L_D(x)
+            L_G_z = L_G(self.G(z_G))
+
+            g_d_balance = (self.gamma * L_x - L_G_z).data[0]
+            import ipdb; ipdb.set_trace() 
+            k_t = k_t + self.lambda_k  * g_d_balance
             k_t = max(min(1, k_t), 0)
 
-            measure = L_x.data[0] + abs((self.gamma * L_x - g_loss).data[0])
+            measure = L_x.data[0] + abs(g_d_balance)
             measure_history.append(measure)
 
             if step % self.log_step == 0:
                 print("[{}/{}] Loss_D: {:.4f} L_x: {:.4f} Loss_G: {:.4f} "
                       "measure: {:.4f}, k_t: {:.4f}, lr: {:.7f}". \
                       format(step, self.max_step, d_loss.data[0], L_x.data[0],
-                             g_loss.data[0], measure, k_t, self.lr))
+                             #g_loss.data[0], measure, k_t, self.lr))
+                             0, measure, k_t, self.lr))
                 x_fake = self.generate(z_fixed, self.model_dir, idx=step)
                 self.autoencode(x_fixed, self.model_dir, idx=step, x_fake=x_fake)
 
@@ -173,10 +179,11 @@ class Trainer(object):
                     info = {
                         'loss/loss_D': d_loss.data[0],
                         'loss/L_x': L_x.data[0],
-                        'loss/Loss_G': g_loss.data[0],
+                        #'loss/Loss_G': g_loss.data[0],
                         'misc/measure': measure,
                         'misc/k_t': k_t,
                         'misc/lr': self.lr,
+                        'misc/balance': g_d_balance,
                     }
                     for tag, value in info.items():
                         self.inject_summary(self.summary_writer, tag, value, step)
