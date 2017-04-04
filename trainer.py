@@ -1,6 +1,8 @@
 from __future__ import print_function
 
 import os
+import StringIO
+import scipy.misc
 import numpy as np
 from glob import glob
 from tqdm import trange
@@ -72,8 +74,18 @@ class Trainer(object):
             self.summary_writer = tf.summary.FileWriter(self.model_dir)
 
             def inject_summary(summary_writer, tag, value, step):
-                summary= tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
-                summary_writer.add_summary(summary, global_step=step)
+                if hasattr(value, '__len__'):
+                    summary = tf.Summary()
+                    sio = StringIO.StringIO()
+
+                    for idx, img in enumerate(value):
+                        scipy.misc.toimage(img).save(sio, format="png")
+                        image_summary = tf.Summary.Image(encoded_image_string=sio.getvalue())
+                        summary.value.add(tag="{}/{}".format(tag, idx), image=image_summary)
+                        summary_writer.add_summary(summary, global_step=step)
+                else:
+                    summary= tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
+                    summary_writer.add_summary(summary, global_step=step)
 
             self.inject_summary = inject_summary
 
@@ -120,12 +132,6 @@ class Trainer(object):
         x_fixed = self._get_variable(next(data_loader))
         vutils.save_image(x_fixed.data, '{}/x_fixed.png'.format(self.model_dir))
 
-        def L_D(inputs):
-            return l1(self.D(inputs), inputs)
-
-        def L_G(inputs):
-            return l1(inputs, self.D(inputs).detach())
-
         k_t = 0
         prev_measure = 1
         measure_history = deque([0]*self.lr_update_step, self.lr_update_step)
@@ -146,40 +152,42 @@ class Trainer(object):
             z_D.data.normal_(0, 1)
             z_G.data.normal_(0, 1)
 
-            L_x = L_D(x)
-            d_loss = L_x - k_t * L_D(self.G(z_D).detach())
-            g_loss = L_G(self.G(z_G))
+            sample_z_D = self.G(z_D)
+            sample_z_G = self.G(z_G)
 
-            loss = d_loss #+ g_loss
+            AE_x = self.D(x)
+            d_loss_real = l1(AE_x, x)
+            d_loss_fake = l1(self.D(sample_z_G.detach()), sample_z_G.detach())
+
+            AE_G = self.D(sample_z_G).detach()
+            d_loss = d_loss_real - k_t * d_loss_fake
+            g_loss = l1(sample_z_G, AE_G)
+
+            loss = d_loss + g_loss
 
             loss.backward()
             optim.step()
 
-            L_x = L_D(x)
-            L_G_z = L_G(self.G(z_G))
-
-            g_d_balance = (self.gamma * L_x - L_G_z).data[0]
-            import ipdb; ipdb.set_trace() 
-            k_t = k_t + self.lambda_k  * g_d_balance
+            g_d_balance = (self.gamma * d_loss_real - d_loss_fake).data[0]
+            k_t += self.lambda_k * g_d_balance
             k_t = max(min(1, k_t), 0)
 
-            measure = L_x.data[0] + abs(g_d_balance)
+            measure = d_loss_real.data[0] + abs(g_d_balance)
             measure_history.append(measure)
 
             if step % self.log_step == 0:
                 print("[{}/{}] Loss_D: {:.4f} L_x: {:.4f} Loss_G: {:.4f} "
                       "measure: {:.4f}, k_t: {:.4f}, lr: {:.7f}". \
-                      format(step, self.max_step, d_loss.data[0], L_x.data[0],
-                             #g_loss.data[0], measure, k_t, self.lr))
-                             0, measure, k_t, self.lr))
+                      format(step, self.max_step, d_loss.data[0], d_loss_real.data[0],
+                             g_loss.data[0], measure, k_t, self.lr))
                 x_fake = self.generate(z_fixed, self.model_dir, idx=step)
                 self.autoencode(x_fixed, self.model_dir, idx=step, x_fake=x_fake)
 
                 if self.use_tensorboard:
                     info = {
                         'loss/loss_D': d_loss.data[0],
-                        'loss/L_x': L_x.data[0],
-                        #'loss/Loss_G': g_loss.data[0],
+                        'loss/L_x': d_loss_real.data[0],
+                        'loss/Loss_G': g_loss.data[0],
                         'misc/measure': measure,
                         'misc/k_t': k_t,
                         'misc/lr': self.lr,
@@ -187,6 +195,14 @@ class Trainer(object):
                     }
                     for tag, value in info.items():
                         self.inject_summary(self.summary_writer, tag, value, step)
+
+                    self.inject_summary(
+                            self.summary_writer, "AE_G", AE_G.data.cpu().numpy(), step)
+                    self.inject_summary(
+                            self.summary_writer, "AE_x", AE_x.data.cpu().numpy(), step)
+                    self.inject_summary(
+                            self.summary_writer, "z_G", sample_z_G.data.cpu().numpy(), step)
+
                     self.summary_writer.flush()
 
             if step % self.save_step == self.save_step - 1:
