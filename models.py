@@ -41,8 +41,11 @@ class GeneratorCNN(BaseModel):
         self.conv = torch.nn.Sequential(*layers)
         
     def main(self, x):
-        fc_out = self.fc(x).view([-1] + self.initial_conv_dim)
-        return self.conv(fc_out)
+        #fc_out = self.fc(x).view([-1] + self.initial_conv_dim)
+        #conv_out = self.conv(fc_out)
+        fc_out = step_by_step(self.fc, x).view([-1] + self.initial_conv_dim)
+        conv_out = step_by_step(self.conv, fc_out)
+        return conv_out
 
 class DiscriminatorCNN(BaseModel):
     def __init__(self, input_channel, z_num, repeat_num, hidden_num, num_gpu):
@@ -50,26 +53,26 @@ class DiscriminatorCNN(BaseModel):
         self.num_gpu = num_gpu
 
         # Encoder
-        self.layers = []
-        self.layers.append(nn.Conv2d(input_channel, hidden_num, 3, 1, 1))
-        self.layers.append(nn.ELU(True))
+        layers = []
+        layers.append(nn.Conv2d(input_channel, hidden_num, 3, 1, 1))
+        layers.append(nn.ELU(True))
 
         prev_channel_num = hidden_num
         for idx in range(repeat_num):
             channel_num = hidden_num * (idx + 1)
-            self.layers.append(nn.Conv2d(prev_channel_num, channel_num, 3, 1, 1))
-            self.layers.append(nn.ELU(True))
-            self.layers.append(nn.Conv2d(channel_num, channel_num, 3, 1, 1))
-            self.layers.append(nn.ELU(True))
+            layers.append(nn.Conv2d(prev_channel_num, channel_num, 3, 1, 1))
+            layers.append(nn.ELU(True))
+            layers.append(nn.Conv2d(channel_num, channel_num, 3, 1, 1))
+            layers.append(nn.ELU(True))
             prev_channel_num = channel_num
 
             if idx < repeat_num - 1:
-                self.layers.append(nn.MaxPool2d(2))
-                #self.layers.append(nn.MaxPool2d(1, 2))
+                layers.append(nn.MaxPool2d(2))
+                #layers.append(nn.MaxPool2d(1, 2))
 
         self.conv1_output_dim = [channel_num, 8, 8]
 
-        self.conv1 = torch.nn.Sequential(*self.layers)
+        self.conv1 = torch.nn.Sequential(*layers)
         self.fc1 = nn.Linear(8*8*channel_num, z_num)
 
         # Decoder
@@ -93,9 +96,24 @@ class DiscriminatorCNN(BaseModel):
         self.conv2 = torch.nn.Sequential(*layers)
 
     def main(self, x):
-        conv1_out = self.conv1(x).view(-1, np.prod(self.conv1_output_dim))
-        fc1_out = self.fc1(conv1_out)
+        #conv1_out = self.conv1(x).view(-1, np.prod(self.conv1_output_dim))
+        #fc1_out = self.fc1(conv1_out)
 
-        fc2_out = self.fc2(fc1_out).view([-1] + self.conv2_input_dim)
-        conv2_out = self.conv2(fc2_out)
+        #fc2_out = self.fc2(fc1_out).view([-1] + self.conv2_input_dim)
+        #conv2_out = self.conv2(fc2_out)
+
+        conv1_out = step_by_step(self.conv1, x).view(-1, np.prod(self.conv1_output_dim))
+        fc1_out = step_by_step(self.fc1, conv1_out)
+
+        fc2_out = step_by_step(self.fc2, fc1_out).view([-1] + self.conv2_input_dim)
+        conv2_out = step_by_step(self.conv2, fc2_out)
+
         return conv2_out
+
+def step_by_step(layers, x):
+    y = x
+    for l in layers:
+        print l, y
+        y = l(y)
+    print y
+    return y

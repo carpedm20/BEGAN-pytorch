@@ -155,10 +155,12 @@ class Trainer(object):
             loss.backward()
             optim.step()
 
-            k_t = k_t + (self.lambda_k * (self.gamma * L_x - g_loss)).data[0]
+            g_d_balance = (self.gamma * L_x - g_loss)).data[0]
+
+            k_t = k_t + self.lambda_k * g_d_balance
             k_t = max(min(1, k_t), 0)
 
-            measure = L_x.data[0] + abs((self.gamma * L_x - g_loss).data[0])
+            measure = L_x.data[0] + abs(g_d_balance)
             measure_history.append(measure)
 
             if step % self.log_step == 0:
@@ -177,6 +179,7 @@ class Trainer(object):
                         'misc/measure': measure,
                         'misc/k_t': k_t,
                         'misc/lr': self.lr,
+                        'misc/balance': g_d_balance,
                     }
                     for tag, value in info.items():
                         self.inject_summary(self.summary_writer, tag, value, step)
