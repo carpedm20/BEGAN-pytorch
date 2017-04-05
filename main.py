@@ -23,7 +23,7 @@ def main(config):
         batch_size = config.sample_per_image
 
     data_loader = get_loader(
-        data_path, batch_size, config.input_scale_size, config.num_worker)
+        data_path, config.split, batch_size, config.input_scale_size, config.num_worker)
 
     trainer = Trainer(config, data_loader)
 

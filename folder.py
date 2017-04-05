@@ -35,6 +35,8 @@ class ImageFolder(data.Dataset):
             raise(RuntimeError("Found 0 images in subfolders of: " + root + "\n"
                                "Supported image extensions are: " + ",".join(IMG_EXTENSIONS)))
 
+        print("Found {} images in subfolders of: {}".format(len(imgs), root))
+
         self.root = root
         self.imgs = imgs
         self.transform = transform
