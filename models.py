@@ -35,14 +35,18 @@ class GeneratorCNN(BaseModel):
                 layers.append(nn.UpsamplingNearest2d(scale_factor=2))
 
         layers.append(nn.Conv2d(hidden_num, output_num, 3, 1, 1))
-        #layers.append(nn.Tanh())
-        layers.append(nn.ELU(True))
 
         self.conv = torch.nn.Sequential(*layers)
         
     def main(self, x):
-        fc_out = self.fc(x).view([-1] + self.initial_conv_dim)
-        return self.conv(fc_out)
+        if True:
+            fc_out = self.fc(x).view([-1] + self.initial_conv_dim)
+            conv_out = self.conv(fc_out)
+        else:
+            print "="*20, "G. Generator"
+            fc_out = step_by_step(self.fc, x).view([-1] + self.initial_conv_dim)
+            conv_out = step_by_step(self.conv, fc_out)
+        return conv_out
 
 class DiscriminatorCNN(BaseModel):
     def __init__(self, input_channel, z_num, repeat_num, hidden_num, num_gpu):
@@ -62,8 +66,6 @@ class DiscriminatorCNN(BaseModel):
 
             if idx < repeat_num - 1:
                 layers.append(nn.Conv2d(channel_num, channel_num, 3, 2, 1))
-                #layers.append(nn.MaxPool2d(2))
-                #layers.append(nn.MaxPool2d(1, 2))
             else:
                 layers.append(nn.Conv2d(channel_num, channel_num, 3, 1, 1))
 
@@ -90,15 +92,34 @@ class DiscriminatorCNN(BaseModel):
                 layers.append(nn.UpsamplingNearest2d(scale_factor=2))
 
         layers.append(nn.Conv2d(hidden_num, input_channel, 3, 1, 1))
-        #layers.append(nn.Tanh())
-        layers.append(nn.ELU(True))
 
         self.conv2 = torch.nn.Sequential(*layers)
 
     def main(self, x):
-        conv1_out = self.conv1(x).view(-1, np.prod(self.conv1_output_dim))
-        fc1_out = self.fc1(conv1_out)
+        if True:
+            conv1_out = self.conv1(x).view(-1, np.prod(self.conv1_output_dim))
+            fc1_out = self.fc1(conv1_out)
 
-        fc2_out = self.fc2(fc1_out).view([-1] + self.conv2_input_dim)
-        conv2_out = self.conv2(fc2_out)
+            fc2_out = self.fc2(fc1_out).view([-1] + self.conv2_input_dim)
+            conv2_out = self.conv2(fc2_out)
+        else:
+            print "="*20, "D. Encoder"
+            conv1_out = step_by_step(self.conv1, x).view(-1, np.prod(self.conv1_output_dim))
+            fc1_out = step_by_step(self.fc1, conv1_out)
+
+            print "="*20, "D. Decoder"
+            fc2_out = step_by_step(self.fc2, fc1_out).view([-1] + self.conv2_input_dim)
+            conv2_out = step_by_step(self.conv2, fc2_out)
         return conv2_out
+
+def step_by_step(layers, x):
+    y = x
+    if type(layers) == torch.nn.Sequential:
+      for l in layers:
+          print y.size(), l
+          y = l(y)
+    else:
+        print layers, y.size()
+        y = layers(y)
+    print y.size()
+    return y

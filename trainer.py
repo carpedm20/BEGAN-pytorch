@@ -37,7 +37,8 @@ class Trainer(object):
         self.num_gpu = config.num_gpu
         self.dataset = config.dataset
 
-        self.lr = config.lr
+        self.g_lr = config.g_lr
+        self.d_lr = config.d_lr
         self.beta1 = config.beta1
         self.beta2 = config.beta2
         self.optimizer = config.optimizer
@@ -102,16 +103,17 @@ class Trainer(object):
         self.D.apply(weights_init)
 
     def train(self):
-        l1 = nn.L1Loss()
+        #l1 = nn.L1Loss(size_average=False)
+        l1 = nn.L1Loss(size_average=True)
 
-        z_D = Variable(torch.FloatTensor(self.batch_size, self.z_num))
+        #z_D = Variable(torch.FloatTensor(self.batch_size, self.z_num))
         z_G = Variable(torch.FloatTensor(self.batch_size, self.z_num))
         z_fixed = Variable(torch.FloatTensor(self.batch_size, self.z_num).normal_(0, 1), volatile=True)
 
         if self.num_gpu > 0:
             l1.cuda()
 
-            z_D = z_D.cuda()
+            #z_D = z_D.cuda()
             z_G = z_G.cuda()
             z_fixed = z_fixed.cuda()
 
@@ -120,12 +122,11 @@ class Trainer(object):
         else:
             raise Exception("[!] Caution! Paper didn't use {} opimizer other than Adam".format(config.optimizer))
 
-        def get_optimizer(lr):
-            return optimizer(
-                chain(self.G.parameters(), self.D.parameters()),
-                lr=lr, betas=(self.beta1, self.beta2))
+        def get_optimizer(g_lr, d_lr):
+            return optimizer(self.G.parameters(), lr=g_lr, betas=(self.beta1, self.beta2)), \
+                   optimizer(self.D.parameters(), lr=d_lr, betas=(self.beta1, self.beta2))
 
-        optim = get_optimizer(self.lr)
+        g_optim, d_optim = get_optimizer(self.g_lr, self.d_lr)
 
         data_loader = iter(self.data_loader)
         x_fixed = self._get_variable(next(data_loader))
@@ -148,24 +149,30 @@ class Trainer(object):
             self.D.zero_grad()
             self.G.zero_grad()
 
-            z_D.data.normal_(0, 1)
             z_G.data.normal_(0, 1)
-
-            sample_z_D = self.G(z_D)
             sample_z_G = self.G(z_G)
 
+            #z_D.data.normal_(0, 1)
+            #sample_z_D = self.G(z_G)
+
             AE_x = self.D(x)
+            AE_G = self.D(sample_z_G.detach())
+
             d_loss_real = l1(AE_x, x)
-            d_loss_fake = l1(self.D(sample_z_G.detach()), sample_z_G.detach())
+            d_loss_fake = l1(AE_G, sample_z_G.detach())
 
-            AE_G = self.D(sample_z_G).detach()
             d_loss = d_loss_real - k_t * d_loss_fake
-            g_loss = l1(sample_z_G, AE_G)
+            g_loss = l1(sample_z_G, AE_G.detach())
 
-            loss = d_loss + g_loss
+            #print(self.D.parameters().next()[0].sum().data[0], self.G.parameters().next()[0].sum().data[0])
 
-            loss.backward()
-            optim.step()
+            g_loss.backward()
+            d_loss.backward()
+
+            g_optim.step()
+            d_optim.step()
+
+            #print(self.D.parameters().next()[0].sum().data[0], self.G.parameters().next()[0].sum().data[0])
 
             g_d_balance = (self.gamma * d_loss_real - d_loss_fake).data[0]
             k_t += self.lambda_k * g_d_balance
@@ -175,10 +182,10 @@ class Trainer(object):
             measure_history.append(measure)
 
             if step % self.log_step == 0:
-                print("[{}/{}] Loss_D: {:.4f} L_x: {:.4f} Loss_G: {:.4f} "
-                      "measure: {:.4f}, k_t: {:.4f}, lr: {:.7f}". \
+                print("[{}/{}] Loss_D: {:.3f} L_x: {:.3f} Loss_G: {:.3f} "
+                      "measure: {:.3f}, k_t: {:.3f}, g_lr: {:.7f}, d_lr: {:.7f}". \
                       format(step, self.max_step, d_loss.data[0], d_loss_real.data[0],
-                             g_loss.data[0], measure, k_t, self.lr))
+                             g_loss.data[0], measure, k_t, self.g_lr, self.d_lr))
                 x_fake = self.generate(z_fixed, self.model_dir, idx=step)
                 self.autoencode(x_fixed, self.model_dir, idx=step, x_fake=x_fake)
 
@@ -189,7 +196,8 @@ class Trainer(object):
                         'loss/Loss_G': g_loss.data[0],
                         'misc/measure': measure,
                         'misc/k_t': k_t,
-                        'misc/lr': self.lr,
+                        'misc/d_lr': self.d_lr,
+                        'misc/g_lr': self.g_lr,
                         'misc/balance': g_d_balance,
                     }
                     for tag, value in info.items():
@@ -210,8 +218,9 @@ class Trainer(object):
             if step % self.lr_update_step == self.lr_update_step - 1:
                 cur_measure = np.mean(measure_history)
                 if cur_measure > prev_measure * 0.9999:
-                    self.lr *= 0.5
-                    optim = get_optimizer(self.lr)
+                    self.g_lr *= 0.5
+                    self.d_lr *= 0.5
+                    g_optim, d_optim = get_optimizer(self.g_lr, self.d_lr)
                 prev_measure = cur_measure
 
     def generate(self, inputs, path, idx=None):
