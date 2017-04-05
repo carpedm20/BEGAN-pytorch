@@ -39,7 +39,7 @@ To train a model:
 
 To test a model (use your `load_path`):
 
-    $ python main.py --dataset=CelebA --load_path=logs/CelebA_0404_105537 --num_gpu=0 --is_train=False
+    $ python main.py --dataset=CelebA --load_path=./logs/CelebA_0405_124806 --num_gpu=0 --is_train=False --split valid
 
 
 ## Results

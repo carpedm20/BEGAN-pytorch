@@ -15,15 +15,17 @@ def main(config):
     if config.is_train:
         data_path = config.data_path
         batch_size = config.batch_size
+        do_shuffle = True
     else:
         if config.test_data_path is None:
             data_path = config.data_path
         else:
             data_path = config.test_data_path
         batch_size = config.sample_per_image
+        do_shuffle = False
 
     data_loader = get_loader(
-        data_path, config.split, batch_size, config.input_scale_size, config.num_worker)
+        data_path, config.split, batch_size, config.input_scale_size, config.num_worker, do_shuffle)
 
     trainer = Trainer(config, data_loader)
 
