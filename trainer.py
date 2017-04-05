@@ -234,7 +234,10 @@ class Trainer(object):
             print("[*] Samples saved: {}".format(x_fake_path))
 
     def test(self):
-        pass
+        data_loader = iter(self.data_loader)
+        x_fixed = self._get_variable(next(data_loader))
+        vutils.save_image(x_fixed.data, '{}/x_fixed_test.png'.format(self.model_dir))
+        self.autoencode(x_fixed, self.model_dir, idx="test", x_fake=None)
 
     def save_model(self, step):
         print("[*] Save models to {}...".format(self.model_dir))
