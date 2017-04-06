@@ -4,6 +4,8 @@ PyTorch implementation of [BEGAN: Boundary Equilibrium Generative Adversarial Ne
 
 ![alt tag](./assets/model.png)
 
+**This project is still in progress. If you are looking for the working code, use** [BEGAN-tensorflow](https://github.com/carpedm20/BEGAN-tensorflow).
+
 
 ## Requirements
 
