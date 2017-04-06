@@ -103,7 +103,6 @@ class Trainer(object):
         self.D.apply(weights_init)
 
     def train(self):
-        #l1 = nn.L1Loss(size_average=False)
         l1 = nn.L1Loss(size_average=True)
 
         #z_D = Variable(torch.FloatTensor(self.batch_size, self.z_num))
@@ -162,15 +161,21 @@ class Trainer(object):
             d_loss_fake = l1(AE_G, sample_z_G.detach())
 
             d_loss = d_loss_real - k_t * d_loss_fake
+
+            d_loss.backward()
+            d_optim.step()
+
+            self.D.zero_grad()
+            self.G.zero_grad()
+
+            sample_z_G = self.G(z_G)
+            AE_G = self.D(sample_z_G.detach())
             g_loss = l1(sample_z_G, AE_G.detach())
 
             #print(self.D.parameters().next()[0].sum().data[0], self.G.parameters().next()[0].sum().data[0])
 
             g_loss.backward()
-            d_loss.backward()
-
             g_optim.step()
-            d_optim.step()
 
             #print(self.D.parameters().next()[0].sum().data[0], self.G.parameters().next()[0].sum().data[0])
 
@@ -216,12 +221,9 @@ class Trainer(object):
                 self.save_model(step)
 
             if step % self.lr_update_step == self.lr_update_step - 1:
-                cur_measure = np.mean(measure_history)
-                if cur_measure > prev_measure * 0.9999:
-                    self.g_lr *= 0.5
-                    self.d_lr *= 0.5
-                    g_optim, d_optim = get_optimizer(self.g_lr, self.d_lr)
-                prev_measure = cur_measure
+                self.g_lr *= 0.5
+                self.d_lr *= 0.5
+                g_optim, d_optim = get_optimizer(self.g_lr, self.d_lr)
 
     def generate(self, inputs, path, idx=None):
         path = '{}/{}_G.png'.format(path, idx)
