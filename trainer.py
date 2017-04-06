@@ -161,7 +161,7 @@ class Trainer(object):
             d_loss_fake = l1(AE_G_d, sample_z_G.detach())
 
             d_loss = d_loss_real - k_t * d_loss_fake
-            g_loss = l1(sample_z_G, AE_G_g)
+            g_loss = l1(sample_z_G, AE_G_g) # this won't still solve the problem
 
             loss = d_loss + g_loss
             loss.backward()

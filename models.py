@@ -110,6 +110,8 @@ class _Loss(nn.Module):
         self.size_average = size_average
 
     def forward(self, input, target):
+        # this won't still solve the problem
+        # which means gradient will not flow through target
         # _assert_no_grad(target)
         backend_fn = getattr(self._backend, type(self).__name__)
         return backend_fn(self.size_average)(input, target)
