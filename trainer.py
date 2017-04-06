@@ -102,7 +102,7 @@ class Trainer(object):
         self.D.apply(weights_init)
 
     def train(self):
-        l1 = nn.L1Loss()
+        l1 = L1Loss()
 
         z_D = Variable(torch.FloatTensor(self.batch_size, self.z_num))
         z_G = Variable(torch.FloatTensor(self.batch_size, self.z_num))
@@ -121,11 +121,10 @@ class Trainer(object):
             raise Exception("[!] Caution! Paper didn't use {} opimizer other than Adam".format(config.optimizer))
 
         def get_optimizer(lr):
-            return optimizer(
-                chain(self.G.parameters(), self.D.parameters()),
-                lr=lr, betas=(self.beta1, self.beta2))
+            return optimizer(self.G.parameters(), lr=lr, betas=(self.beta1, self.beta2)), \
+                   optimizer(self.D.parameters(), lr=lr, betas=(self.beta1, self.beta2))
 
-        optim = get_optimizer(self.lr)
+        g_optim, d_optim = get_optimizer(self.lr)
 
         data_loader = iter(self.data_loader)
         x_fixed = self._get_variable(next(data_loader))
@@ -151,21 +150,24 @@ class Trainer(object):
             z_D.data.normal_(0, 1)
             z_G.data.normal_(0, 1)
 
-            sample_z_D = self.G(z_D)
+            #sample_z_D = self.G(z_D)
             sample_z_G = self.G(z_G)
 
             AE_x = self.D(x)
-            d_loss_real = l1(AE_x, x)
-            d_loss_fake = l1(self.D(sample_z_G.detach()), sample_z_G.detach())
+            AE_G_d = self.D(sample_z_G.detach())
+            AE_G_g = self.D(sample_z_G)
 
-            AE_G = self.D(sample_z_G).detach()
+            d_loss_real = l1(AE_x, x)
+            d_loss_fake = l1(AE_G_d, sample_z_G.detach())
+
             d_loss = d_loss_real - k_t * d_loss_fake
-            g_loss = l1(sample_z_G, AE_G)
+            g_loss = l1(sample_z_G, AE_G_g)
 
             loss = d_loss + g_loss
-
             loss.backward()
-            optim.step()
+
+            g_optim.step()
+            d_optim.step()
 
             g_d_balance = (self.gamma * d_loss_real - d_loss_fake).data[0]
             k_t += self.lambda_k * g_d_balance
@@ -196,7 +198,7 @@ class Trainer(object):
                         self.inject_summary(self.summary_writer, tag, value, step)
 
                     self.inject_summary(
-                            self.summary_writer, "AE_G", AE_G.data.cpu().numpy(), step)
+                            self.summary_writer, "AE_G", AE_G_g.data.cpu().numpy(), step)
                     self.inject_summary(
                             self.summary_writer, "AE_x", AE_x.data.cpu().numpy(), step)
                     self.inject_summary(
@@ -211,7 +213,7 @@ class Trainer(object):
                 cur_measure = np.mean(measure_history)
                 if cur_measure > prev_measure * 0.9999:
                     self.lr *= 0.5
-                    optim = get_optimizer(self.lr)
+                    g_optim, d_optim = get_optimizer(self.lr)
                 prev_measure = cur_measure
 
     def generate(self, inputs, path, idx=None):

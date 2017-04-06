@@ -102,3 +102,28 @@ class DiscriminatorCNN(BaseModel):
         fc2_out = self.fc2(fc1_out).view([-1] + self.conv2_input_dim)
         conv2_out = self.conv2(fc2_out)
         return conv2_out
+
+class _Loss(nn.Module):
+
+    def __init__(self, size_average=True):
+        super(_Loss, self).__init__()
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        # _assert_no_grad(target)
+        backend_fn = getattr(self._backend, type(self).__name__)
+        return backend_fn(self.size_average)(input, target)
+
+class L1Loss(_Loss):
+    r"""Creates a criterion that measures the mean absolute value of the
+    element-wise difference between input `x` and target `y`:
+
+    :math:`{loss}(x, y)  = 1/n \sum |x_i - y_i|`
+
+    `x` and `y` arbitrary shapes with a total of `n` elements each.
+
+    The sum operation still operates over all the elements, and divides by `n`.
+
+    The division by `n` can be avoided if one sets the constructor argument `sizeAverage=False`
+    """
+    pass
