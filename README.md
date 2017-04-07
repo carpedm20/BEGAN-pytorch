@@ -1,9 +1,5 @@
 # BEGAN in PyTorch
 
-PyTorch implementation of [BEGAN: Boundary Equilibrium Generative Adversarial Networks](https://arxiv.org/abs/1703.10717).
-
-![alt tag](./assets/model.png)
-
 **This project is still in progress. If you are looking for the working code, use** [BEGAN-tensorflow](https://github.com/carpedm20/BEGAN-tensorflow).
 
 
